@@ -1,0 +1,72 @@
+name: Update Weather Chart GIF
+
+on:
+  schedule:
+    # Runs every 15 minutes (adjust to */30 for every 30 mins, or 0 * * * * for hourly)
+    - cron: '3 */2  * * *'
+  workflow_dispatch: # Allows you to trigger a manual run anytime from the Actions tab
+
+permissions:
+  contents: write # Required to push the updated GIF back to your repository
+
+env:
+  IMAGE_URL: "https://www.tropicaltidbits.com/storminfo/92B_tracks_latest.png" 
+  MAX_FRAMES: 500   # Number of frames to keep in the loop (24 * 15 mins = 6 hours)
+  FRAME_DELAY: 90  # Delay between frames in centiseconds (30 = 0.3 seconds per frame)
+
+jobs:
+  build-gif:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download new frame & prune old frames
+        run: |
+          mkdir -p frames
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          TEMP_FILE="frames/temp_${TIMESTAMP}.img"
+
+          # Download the image (-f fails cleanly on 404/500 errors, -L follows redirects)
+          curl -f -s -S -L "$IMAGE_URL" -o "$TEMP_FILE"
+
+          # Compare MD5 hash with the most recent saved frame to avoid duplicate frames
+          LAST_FILE=$(ls -1 frames/frame_* 2>/dev/null | sort | tail -n 1)
+          if [ -n "$LAST_FILE" ]; then
+            NEW_HASH=$(md5sum "$TEMP_FILE" | awk '{print $1}')
+            OLD_HASH=$(md5sum "$LAST_FILE" | awk '{print $1}')
+            if [ "$NEW_HASH" = "$OLD_HASH" ]; then
+              echo "Weather chart has not changed since last check. Skipping."
+              rm -f "$TEMP_FILE"
+              exit 0
+            fi
+          fi
+
+          # Save as new timestamped frame
+          mv "$TEMP_FILE" "frames/frame_${TIMESTAMP}.img"
+
+          # Keep only the latest MAX_FRAMES files and delete older ones
+          ls -1t frames/frame_* | tail -n +$((MAX_FRAMES + 1)) | xargs -r rm -f
+
+      - name: Build GIF with ImageMagick
+        run: |
+          # Only rebuild if at least 1 frame exists
+          if ls frames/frame_* 1> /dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y imagemagick
+            convert -delay "$FRAME_DELAY" -loop 0 frames/frame_* weather.gif
+          fi
+
+      - name: Commit and push updated GIF
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add frames/ weather.gif
+
+          # Only commit if there are actual changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Update weather GIF ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          else
+            echo "No new changes to commit."
+          fi
