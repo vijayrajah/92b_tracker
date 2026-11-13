@@ -2,8 +2,7 @@ name: Update Weather Chart GIF
 
 on:
   schedule:
-    # Runs every 15 minutes (adjust to */30 for every 30 mins, or 0 * * * * for hourly)
-    - cron: '3 */2  * * *'
+    - cron: '3 */2 * * *'
   workflow_dispatch: # Allows you to trigger a manual run anytime from the Actions tab
 
 permissions:
