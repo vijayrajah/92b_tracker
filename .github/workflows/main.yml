@@ -13,6 +13,8 @@ env:
   IMAGE_URL: "https://www.tropicaltidbits.com/storminfo/92B_tracks_latest.png" 
   MAX_FRAMES: 500   # Number of frames to keep in the loop (24 * 15 mins = 6 hours)
   FRAME_DELAY: 90  # Delay between frames in centiseconds (30 = 0.3 seconds per frame)
+  REFERER_URL: "https://www.tropicaltidbits.com/storminfo/"
+  USER_AGENT: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0"
 
 jobs:
   build-gif:
@@ -29,7 +31,10 @@ jobs:
           TEMP_FILE="frames/temp_${TIMESTAMP}.img"
 
           # Download the image (-f fails cleanly on 404/500 errors, -L follows redirects)
-          curl -f -s -S -L "$IMAGE_URL" -o "$TEMP_FILE"
+          curl -f -s -S -L \
+            -e "$REFERER_URL" \
+            -A "$USER_AGENT" \
+            "$IMAGE_URL" -o "$TEMP_FILE"
 
           # Compare MD5 hash with the most recent saved frame to avoid duplicate frames
           LAST_FILE=$(ls -1 frames/frame_* 2>/dev/null | sort | tail -n 1)
