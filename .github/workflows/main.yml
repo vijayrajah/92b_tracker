@@ -1,8 +1,6 @@
 name: Update Weather Chart GIF
 
 on:
-  schedule:
-    - cron: '3 */2 * * *'
   workflow_dispatch: # Allows you to trigger a manual run anytime from the Actions tab
 
 permissions:
